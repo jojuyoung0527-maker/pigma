@@ -22,7 +22,8 @@ from downloader import VERSION, DownloadError, extract_urls, validate_cookies, M
 ROOT = Path(__file__).resolve().parent
 DATA = Path(os.getenv("DATA_DIR", str(ROOT / "data"))).resolve()
 PORT = int(os.getenv("PORT", "8080"))
-HOST = "127.0.0.1"
+CLOUD = os.getenv("SOURCEFLOW_CLOUD", "0") == "1"
+HOST = "0.0.0.0" if CLOUD else "127.0.0.1"
 CSRF = secrets.token_urlsafe(32)
 LOCK = threading.RLock()
 POOL = ThreadPoolExecutor(max_workers=2)
@@ -38,6 +39,9 @@ def db():
 
 
 def init():
+    if CLOUD:
+        import static_ffmpeg
+        static_ffmpeg.add_paths(weak=True)
     DATA.mkdir(parents=True, exist_ok=True)
     (DATA / "downloads").mkdir(exist_ok=True)
     with db() as c:
@@ -294,10 +298,6 @@ class Handler(BaseHTTPRequestHandler):
 
     def authenticate(self, write=False):
         if CLOUD:
-            if ACCESS_PASSWORD:
-                expected = "Basic " + base64.b64encode(f"{ACCESS_USER}:{ACCESS_PASSWORD}".encode("utf-8")).decode("ascii")
-                if not hmac.compare_digest(self.headers.get("Authorization", ""), expected):
-                    raise DownloadError("AUTH_REQUIRED", "SourceFlow 테스트 사이트 로그인이 필요합니다.")
             host = self.headers.get("Host", "")
             origin = self.headers.get("Origin")
             if origin and origin not in {f"https://{host}", f"http://{host}"}:
