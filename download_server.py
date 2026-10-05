@@ -298,12 +298,17 @@ class Handler(BaseHTTPRequestHandler):
 
     def authenticate(self, write=False):
         if CLOUD:
-            host = self.headers.get("Host", "")
-            origin = self.headers.get("Origin")
-            if origin and origin not in {f"https://{host}", f"http://{host}"}:
-                raise DownloadError("FORBIDDEN", "다른 사이트의 요청은 허용하지 않습니다.")
-            if self.headers.get("Sec-Fetch-Site") == "cross-site":
-                raise DownloadError("FORBIDDEN", "다른 사이트의 요청은 허용하지 않습니다.")
+            # Public page navigation may legitimately arrive from ChatGPT,
+            # search engines, bookmarks, email, etc. Cross-site navigation is
+            # therefore allowed for read-only GET requests. State-changing API
+            # requests remain same-origin and CSRF protected.
+            if write:
+                host = self.headers.get("Host", "")
+                origin = self.headers.get("Origin")
+                if origin and origin not in {f"https://{host}", f"http://{host}"}:
+                    raise DownloadError("FORBIDDEN", "다른 사이트의 요청은 허용하지 않습니다.")
+                if self.headers.get("Sec-Fetch-Site") == "cross-site":
+                    raise DownloadError("FORBIDDEN", "다른 사이트의 요청은 허용하지 않습니다.")
         else:
             origins = {f"http://127.0.0.1:{PORT}", f"http://localhost:{PORT}"}
             if self.client_address[0] != "127.0.0.1" or self.headers.get("Host") not in {f"127.0.0.1:{PORT}", f"localhost:{PORT}"}:
