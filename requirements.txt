@@ -1,0 +1,2 @@
+yt-dlp[default]==2026.8.19
+static-ffmpeg==3.0
